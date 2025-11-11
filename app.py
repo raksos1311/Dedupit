@@ -492,6 +492,321 @@ def procesar_miniaturas(carpeta_base, eliminar_originales):
     detener_flag = False
 
 
+# --- Funciones Nuevas ---
+def generar_preview_html(carpeta_base):
+    """
+    Genera un HTML con vista previa de 1 de cada 5 imágenes en la carpeta.
+    NO es recursivo, solo trabaja en la carpeta indicada.
+    Genera el HTML en la misma carpeta con el nombre 'preview.html'.
+    """
+    global procesando, detener_flag
+    procesando = True
+    detener_flag = False
+    
+    log_status("🖼️ Iniciando generación de preview HTML...")
+    log_status(f"📂 Carpeta objetivo: {carpeta_base}")
+    
+    try:
+        # Obtener solo archivos de imagen en la carpeta (no recursivo)
+        archivos = [f for f in os.listdir(carpeta_base) 
+                   if os.path.isfile(os.path.join(carpeta_base, f)) and 
+                   f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff'))]
+        
+        if not archivos:
+            log_status("⚠️ No se encontraron imágenes en la carpeta.")
+            procesando = False
+            return
+        
+        # Ordenar archivos alfabéticamente
+        archivos.sort()
+        
+        # Seleccionar 1 de cada 5 imágenes
+        imagenes_seleccionadas = [archivos[i] for i in range(0, len(archivos), 5)]
+        
+        log_status(f"📊 Total de imágenes: {len(archivos)}")
+        log_status(f"📋 Imágenes seleccionadas para preview: {len(imagenes_seleccionadas)}")
+        
+        # Generar HTML
+        html_content = """<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Preview - """ + os.path.basename(carpeta_base) + """</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #1a1a1a; 
+            color: #eee; 
+            margin: 2em; 
+        }
+        h1 { 
+            color: #17a2b8; 
+            border-bottom: 2px solid #17a2b8; 
+            padding-bottom: 0.5em; 
+        }
+        .stats { 
+            background: #2a2a2a; 
+            padding: 1em; 
+            border-radius: 0.5em; 
+            margin-bottom: 2em; 
+        }
+        .gallery { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            gap: 1.5em; 
+            margin-top: 2em; 
+        }
+        .item { 
+            background: #2a2a2a; 
+            padding: 1em; 
+            border-radius: 0.5em; 
+            text-align: center; 
+        }
+        .item img { 
+            max-width: 100%; 
+            height: auto; 
+            border-radius: 0.3em; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
+        }
+        .item .filename { 
+            margin-top: 0.5em; 
+            font-size: 0.85em; 
+            color: #17a2b8; 
+            word-break: break-all; 
+        }
+        .item .info { 
+            margin-top: 0.3em; 
+            font-size: 0.75em; 
+            color: #888; 
+        }
+    </style>
+</head>
+<body>
+    <h1>🖼️ Preview: """ + os.path.basename(carpeta_base) + """</h1>
+    <div class="stats">
+        <strong>📂 Carpeta:</strong> """ + carpeta_base + """<br>
+        <strong>📊 Total de imágenes:</strong> """ + str(len(archivos)) + """<br>
+        <strong>🔍 Muestreadas (1 de cada 5):</strong> """ + str(len(imagenes_seleccionadas)) + """
+    </div>
+    <div class="gallery">
+"""
+        
+        # Agregar cada imagen seleccionada
+        for idx, nombre in enumerate(imagenes_seleccionadas):
+            if detener_flag:
+                log_status("🟥 Proceso detenido por el usuario.")
+                procesando = False
+                return
+            
+            ruta_completa = os.path.join(carpeta_base, nombre)
+            try:
+                # Obtener dimensiones de la imagen
+                with Image.open(ruta_completa) as img:
+                    w, h = img.size
+                    tamaño_kb = os.path.getsize(ruta_completa) / 1024
+                    
+                    html_content += f"""
+        <div class="item">
+            <img src="{nombre}" alt="{nombre}">
+            <div class="filename">📄 {nombre}</div>
+            <div class="info">{w} x {h} px | {tamaño_kb:.1f} KB</div>
+        </div>
+"""
+                    log_status(f"✅ Procesada: {nombre} ({w}x{h})")
+            except Exception as e:
+                log_status(f"⚠️ Error al procesar {nombre}: {e}")
+        
+        html_content += """
+    </div>
+</body>
+</html>
+"""
+        
+        # Guardar HTML en la carpeta
+        ruta_html = os.path.join(carpeta_base, "preview.html")
+        with open(ruta_html, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        log_status(f"✅ Preview HTML generado exitosamente: {ruta_html}")
+        log_status(f"📋 Puedes abrirlo en tu navegador para ver las miniaturas.")
+        
+    except Exception as e:
+        log_status(f"❌ Error al generar preview: {e}")
+    
+    procesando = False
+    detener_flag = False
+
+
+def analizar_imagenes(carpeta_base):
+    """
+    Analiza imágenes de manera recursiva y genera estadísticas detalladas.
+    Agrupa por tamaño de archivo, resolución, y detecta imágenes < 1280px.
+    Retorna información por carpeta para identificar cuáles recuperar.
+    """
+    global procesando, detener_flag
+    procesando = True
+    detener_flag = False
+    
+    log_status("📊 Iniciando análisis de imágenes...")
+    log_status(f"📂 Carpeta base: {carpeta_base}")
+    
+    # Estructuras de datos para estadísticas
+    stats_por_carpeta = {}
+    stats_tamaño = defaultdict(list)  # {tamaño_kb: [rutas]}
+    stats_resolucion = defaultdict(list)  # {resolución: [rutas]}
+    imagenes_pequenas = []  # Imágenes con max(w,h) < 1280
+    total_imagenes = 0
+    
+    try:
+        # Escanear recursivamente
+        for root, dirs, files in os.walk(carpeta_base):
+            if detener_flag:
+                log_status("🟥 Análisis detenido por el usuario.")
+                procesando = False
+                return
+            
+            # Filtrar solo imágenes
+            imagenes = [f for f in files if f.lower().endswith(
+                ('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff'))]
+            
+            if not imagenes:
+                continue
+            
+            log_status(f"📁 Analizando: {root} ({len(imagenes)} imágenes)")
+            
+            # Inicializar stats para esta carpeta
+            carpeta_stats = {
+                "total": len(imagenes),
+                "pequenas": 0,
+                "resoluciones": defaultdict(int),
+                "tamanos": defaultdict(int)
+            }
+            
+            for nombre in imagenes:
+                if detener_flag:
+                    break
+                
+                ruta = os.path.join(root, nombre)
+                try:
+                    # Obtener tamaño de archivo
+                    tamaño_bytes = os.path.getsize(ruta)
+                    tamaño_kb = tamaño_bytes / 1024
+                    tamaño_mb = tamaño_kb / 1024
+                    
+                    # Categorizar tamaño (rangos en MB)
+                    if tamaño_mb < 0.1:
+                        categoria_tamaño = "< 100 KB"
+                    elif tamaño_mb < 0.5:
+                        categoria_tamaño = "100-500 KB"
+                    elif tamaño_mb < 1:
+                        categoria_tamaño = "0.5-1 MB"
+                    elif tamaño_mb < 5:
+                        categoria_tamaño = "1-5 MB"
+                    elif tamaño_mb < 10:
+                        categoria_tamaño = "5-10 MB"
+                    else:
+                        categoria_tamaño = "> 10 MB"
+                    
+                    stats_tamaño[categoria_tamaño].append(ruta)
+                    carpeta_stats["tamanos"][categoria_tamaño] += 1
+                    
+                    # Obtener resolución
+                    with Image.open(ruta) as img:
+                        w, h = img.size
+                        resolucion = f"{w}x{h}"
+                        max_dimension = max(w, h)
+                        
+                        stats_resolucion[resolucion].append(ruta)
+                        carpeta_stats["resoluciones"][resolucion] += 1
+                        
+                        # Verificar si es pequeña (< 1280px en dimensión mayor)
+                        if max_dimension < 1280:
+                            imagenes_pequenas.append({
+                                "ruta": ruta,
+                                "carpeta": root,
+                                "nombre": nombre,
+                                "resolucion": resolucion,
+                                "tamaño_kb": tamaño_kb
+                            })
+                            carpeta_stats["pequenas"] += 1
+                    
+                    total_imagenes += 1
+                    
+                except Exception as e:
+                    log_status(f"⚠️ Error al analizar {ruta}: {e}")
+            
+            # Guardar stats de esta carpeta
+            stats_por_carpeta[root] = carpeta_stats
+        
+        # Calcular porcentaje de imágenes pequeñas
+        porcentaje_pequenas = (len(imagenes_pequenas) / total_imagenes * 100) if total_imagenes > 0 else 0
+        
+        # Generar reporte en el log
+        log_status("\n" + "="*80)
+        log_status("📊 REPORTE DE ANÁLISIS DE IMÁGENES")
+        log_status("="*80)
+        log_status(f"\n📈 ESTADÍSTICAS GENERALES:")
+        log_status(f"   Total de imágenes analizadas: {total_imagenes}")
+        log_status(f"   Imágenes < 1280px (dimensión mayor): {len(imagenes_pequenas)} ({porcentaje_pequenas:.1f}%)")
+        
+        log_status(f"\n📦 DISTRIBUCIÓN POR TAMAÑO DE ARCHIVO:")
+        for categoria in sorted(stats_tamaño.keys()):
+            cantidad = len(stats_tamaño[categoria])
+            porcentaje = (cantidad / total_imagenes * 100) if total_imagenes > 0 else 0
+            log_status(f"   {categoria:15} : {cantidad:5} imágenes ({porcentaje:5.1f}%)")
+        
+        log_status(f"\n📐 TOP 10 RESOLUCIONES MÁS COMUNES:")
+        resoluciones_ordenadas = sorted(stats_resolucion.items(), key=lambda x: len(x[1]), reverse=True)[:10]
+        for resolucion, rutas in resoluciones_ordenadas:
+            cantidad = len(rutas)
+            porcentaje = (cantidad / total_imagenes * 100) if total_imagenes > 0 else 0
+            log_status(f"   {resolucion:20} : {cantidad:5} imágenes ({porcentaje:5.1f}%)")
+        
+        log_status(f"\n📁 ANÁLISIS POR CARPETA:")
+        for carpeta in sorted(stats_por_carpeta.keys()):
+            stats = stats_por_carpeta[carpeta]
+            if stats["pequenas"] > 0:
+                porcentaje_pequenas_carpeta = (stats["pequenas"] / stats["total"] * 100)
+                log_status(f"\n   📂 {carpeta}")
+                log_status(f"      Total: {stats['total']} | Pequeñas (<1280px): {stats['pequenas']} ({porcentaje_pequenas_carpeta:.1f}%)")
+                
+                # Mostrar distribución de tamaños en esta carpeta
+                if stats["tamanos"]:
+                    log_status(f"      Tamaños: {dict(stats['tamanos'])}")
+                
+                # Mostrar top 3 resoluciones en esta carpeta
+                top_res = sorted(stats["resoluciones"].items(), key=lambda x: x[1], reverse=True)[:3]
+                if top_res:
+                    res_str = ", ".join([f"{res}({cnt})" for res, cnt in top_res])
+                    log_status(f"      Top resoluciones: {res_str}")
+        
+        if imagenes_pequenas:
+            log_status(f"\n⚠️ CARPETAS CON IMÁGENES PEQUEÑAS (POSIBLE DAÑO):")
+            carpetas_afectadas = set([img["carpeta"] for img in imagenes_pequenas])
+            for carpeta in sorted(carpetas_afectadas):
+                imgs_carpeta = [img for img in imagenes_pequenas if img["carpeta"] == carpeta]
+                log_status(f"   📁 {carpeta} → {len(imgs_carpeta)} imagen(es) afectada(s)")
+        
+        log_status("\n" + "="*80)
+        log_status("✅ Análisis completado exitosamente.")
+        log_status("="*80 + "\n")
+        
+        # Actualizar resumen en estado_actual para la UI
+        estado_actual["resumen"] = {
+            "total_imagenes": total_imagenes,
+            "imagenes_pequenas": len(imagenes_pequenas),
+            "porcentaje_pequenas": f"{porcentaje_pequenas:.1f}%",
+            "carpetas_analizadas": len(stats_por_carpeta),
+            "carpetas_afectadas": len(set([img["carpeta"] for img in imagenes_pequenas]))
+        }
+        
+    except Exception as e:
+        log_status(f"❌ Error durante el análisis: {e}")
+    
+    procesando = False
+    detener_flag = False
+
+
 # --- HTML de la interfaz web ---
 HTML = """
 <!DOCTYPE html>
@@ -510,6 +825,10 @@ button { padding: .5em 1em; margin: .5em; background: #28a745; color: #fff; bord
 button:hover { background: #218838; }
 button.miniaturas { background: #007bff; }
 button.miniaturas:hover { background: #0056b3; }
+button.preview { background: #6f42c1; }
+button.preview:hover { background: #5a32a3; }
+button.analizador { background: #fd7e14; }
+button.analizador:hover { background: #e8590c; }
 button.detener { background: #dc3545; }
 button.detener:hover { background: #c82333; }
 label { margin-left: 1em; }
@@ -549,6 +868,24 @@ async function generarMiniaturas(){
   document.getElementById('log').textContent = 'Generando miniaturas...';
   await fetch('/generar_miniaturas?v=""" + VERSION + """', {method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({carpeta: carpeta, eliminar: eliminar, recursivo: recursivo})
+  });
+  actualizar();
+}
+
+async function generarPreview(){
+  const carpeta = document.getElementById('carpeta').value;
+  document.getElementById('log').textContent = 'Generando preview HTML...';
+  await fetch('/generar_preview?v=""" + VERSION + """', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({carpeta: carpeta})
+  });
+  actualizar();
+}
+
+async function analizarImagenes(){
+  const carpeta = document.getElementById('carpeta').value;
+  document.getElementById('log').textContent = 'Analizando imágenes...';
+  await fetch('/analizar_imagenes?v=""" + VERSION + """', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({carpeta: carpeta})
   });
   actualizar();
 }
@@ -813,6 +1150,8 @@ window.onload = actualizar;
 <div class="btn-group">
   <button onclick="buscarDuplicados()">🔍 Buscar Duplicados</button>
   <button class="miniaturas" onclick="generarMiniaturas()">🖼️ Generar Miniaturas</button>
+  <button class="preview" onclick="generarPreview()">📸 Preview Generator</button>
+  <button class="analizador" onclick="analizarImagenes()">📊 Analizador</button>
   <button class="detener" onclick="detener()">⏹️ Detener</button>
   <button onclick="limpiar()" style="background: #6c757d;">🔄 Limpiar</button>
 </div>
@@ -1020,6 +1359,48 @@ def limpiar_dedupeados():
     log_status(f"🧹 Limpieza: {eliminados} grupo(s) dedupeado(s) eliminado(s) de la lista")
     
     return jsonify({"ok": True, "eliminados": eliminados})
+
+
+@app.route("/generar_preview", methods=["POST"])
+def ejecutar_generar_preview():
+    global procesando
+    if procesando:
+        return jsonify({"ok": False, "error": "Ya hay un proceso en ejecución"})
+    
+    data = request.get_json()
+    carpeta = data.get("carpeta")
+    
+    if not carpeta or not os.path.exists(carpeta):
+        return jsonify({"ok": False, "error": "Carpeta no válida"})
+    
+    estado_actual["mensaje"] = "Generando preview HTML..."
+    estado_actual["detalles"].clear()
+    
+    # Ejecutar en un hilo separado
+    threading.Thread(target=generar_preview_html, args=(carpeta,), daemon=True).start()
+    
+    return jsonify({"ok": True})
+
+
+@app.route("/analizar_imagenes", methods=["POST"])
+def ejecutar_analizar_imagenes():
+    global procesando
+    if procesando:
+        return jsonify({"ok": False, "error": "Ya hay un proceso en ejecución"})
+    
+    data = request.get_json()
+    carpeta = data.get("carpeta")
+    
+    if not carpeta or not os.path.exists(carpeta):
+        return jsonify({"ok": False, "error": "Carpeta no válida"})
+    
+    estado_actual["mensaje"] = "Analizando imágenes..."
+    estado_actual["detalles"].clear()
+    
+    # Ejecutar en un hilo separado
+    threading.Thread(target=analizar_imagenes, args=(carpeta,), daemon=True).start()
+    
+    return jsonify({"ok": True})
 
 
 @app.route("/detener", methods=["POST"])
