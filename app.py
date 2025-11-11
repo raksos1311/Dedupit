@@ -724,44 +724,74 @@ async function actualizar(){
   }
   document.getElementById('resumen').innerHTML = resumenHTML;
   
-  // Mostrar duplicados
-  let duplicadosHTML = '';
-  if (data.duplicados && data.duplicados.length > 0) {
-    for (const grupo of data.duplicados) {
-      const esDeduplicado = grupo.count === 1;
-      const claseExtra = esDeduplicado ? 'deduped' : '';
-      
-      duplicadosHTML += `
-        <div class="grupo-duplicado ${claseExtra}">
-          <div class="hash">Hash: ${grupo.hash}</div>
-          <div class="tamaño">Tamaño: ${grupo.tamaño} bytes | Archivos: ${grupo.count}</div>
-      `;
-      
-      for (const archivo of grupo.archivos) {
-        const archivoEscapado = archivo.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'");
-        duplicadosHTML += `
-          <div class="archivo">
-            <input type="checkbox" class="archivo-checkbox" data-hash="${grupo.hash}" data-ruta="${archivoEscapado}">
-            📄 <a href="javascript:void(0)" onclick="abrirArchivo(event, '${archivoEscapado}')">${archivo}</a>
-          </div>`;
+  // GUARDAR estado de checkboxes ANTES de actualizar HTML
+  const checkboxesAnteriores = {};
+  document.querySelectorAll('.archivo-checkbox').forEach(cb => {
+    const key = cb.dataset.hash + '::' + cb.dataset.ruta;
+    checkboxesAnteriores[key] = cb.checked;
+  });
+  
+  // Verificar si hay cambios en los datos antes de actualizar
+  const duplicadosStr = JSON.stringify(data.duplicados || []);
+  if (window._lastDuplicadosStr === duplicadosStr) {
+    // No hay cambios, solo restaurar checkboxes (por si acaso)
+    document.querySelectorAll('.archivo-checkbox').forEach(cb => {
+      const key = cb.dataset.hash + '::' + cb.dataset.ruta;
+      if (checkboxesAnteriores[key] && !cb.checked) {
+        cb.checked = true;
       }
-      
-      if (esDeduplicado && grupo.eliminados) {
-        duplicadosHTML += `<div class="mensaje-exito">✅ Duplicados eliminados. ${grupo.mb_liberados.toFixed(2)} MB recuperados!</div>`;
-      } else if (!esDeduplicado) {
-        duplicadosHTML += `
-          <button class="btn-dedup" onclick="dedupGrupoSeleccionados('${grupo.hash}')">
-            <span class="btn-text">🗑️ Dedup it!</span>
-            <span class="btn-subtext">seleccionados</span>
-          </button>`;
-      }
-      
-      duplicadosHTML += `</div>`;
-    }
+    });
   } else {
-    duplicadosHTML = '<div style="color: #888;">No se han detectado duplicados aún...</div>';
+    // HAY cambios, actualizar TODO el HTML
+    window._lastDuplicadosStr = duplicadosStr;
+    
+    // Mostrar duplicados
+    let duplicadosHTML = '';
+    if (data.duplicados && data.duplicados.length > 0) {
+      for (const grupo of data.duplicados) {
+        const esDeduplicado = grupo.count === 1;
+        const claseExtra = esDeduplicado ? 'deduped' : '';
+        
+        duplicadosHTML += `
+          <div class="grupo-duplicado ${claseExtra}">
+            <div class="hash">Hash: ${grupo.hash}</div>
+            <div class="tamaño">Tamaño: ${grupo.tamaño} bytes | Archivos: ${grupo.count}</div>
+        `;
+        
+        for (const archivo of grupo.archivos) {
+          const archivoEscapado = archivo.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'");
+          duplicadosHTML += `
+            <div class="archivo">
+              <input type="checkbox" class="archivo-checkbox" data-hash="${grupo.hash}" data-ruta="${archivoEscapado}">
+              📄 <a href="javascript:void(0)" onclick="abrirArchivo(event, '${archivoEscapado}')">${archivo}</a>
+            </div>`;
+        }
+        
+        if (esDeduplicado && grupo.eliminados) {
+          duplicadosHTML += `<div class="mensaje-exito">✅ Duplicados eliminados. ${grupo.mb_liberados.toFixed(2)} MB recuperados!</div>`;
+        } else if (!esDeduplicado) {
+          duplicadosHTML += `
+            <button class="btn-dedup" onclick="dedupGrupoSeleccionados('${grupo.hash}')">
+              <span class="btn-text">🗑️ Dedup it!</span>
+              <span class="btn-subtext">seleccionados</span>
+            </button>`;
+        }
+        
+        duplicadosHTML += `</div>`;
+      }
+    } else {
+      duplicadosHTML = '<div style="color: #888;">No se han detectado duplicados aún...</div>';
+    }
+    document.getElementById('duplicados').innerHTML = duplicadosHTML;
+    
+    // RESTAURAR estado de checkboxes DESPUÉS de actualizar HTML
+    document.querySelectorAll('.archivo-checkbox').forEach(cb => {
+      const key = cb.dataset.hash + '::' + cb.dataset.ruta;
+      if (checkboxesAnteriores[key]) {
+        cb.checked = true;
+      }
+    });
   }
-  document.getElementById('duplicados').innerHTML = duplicadosHTML;
   
   // Scroll automático al final del log
   const logElement = document.getElementById('log');
