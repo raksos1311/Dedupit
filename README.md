@@ -106,6 +106,31 @@ Los logs se guardan en `Logs/log-YYYYMMDD_HHMMSS.txt` (pendiente de implementar)
 - **Thread-safe**: Operaciones largas no bloquean la UI
 - **Cancelable**: Flag de detención respetado en loops
 
+## ⚠️ Known Limitations
+
+### 🔒 Windows Session Lock Issue
+
+**DO NOT lock your Windows session** while a scan is in progress.
+
+**Problem:** The process may hang because Windows suspends I/O operations when the session is locked, especially with:
+- Network drives (`\\server\...`)
+- External USB devices
+- Files in user profile (`C:\Users\...`)
+
+**Recommendations:**
+- ✅ Keep session active during long scans
+- ✅ Use "Stop" button before locking
+- ✅ Use screensaver without lock (screen off only)
+- ✅ For very long scans, avoid network/USB folders
+
+**Workaround:** If you need to lock, run scans on:
+- Local secondary drives (D:\, E:\, etc.)
+- Folders outside your user profile
+
+**Technical Cause:** `ThreadPoolExecutor` with blocking I/O gets stuck when Windows suspends file read operations during session lock. This is a known limitation that will be addressed in v1.1.0.
+
+**See:** `ANALISIS_BLOQUEO_SESION.md` for detailed technical analysis.
+
 ## 🐛 Troubleshooting
 
 ### "Ya hay un proceso en ejecución"
@@ -119,6 +144,11 @@ Los logs se guardan en `Logs/log-YYYYMMDD_HHMMSS.txt` (pendiente de implementar)
 ### Error de permisos al eliminar
 - Cierra aplicaciones que usen los archivos
 - Ejecuta como administrador si es necesario
+
+### Process hangs after locking Windows session
+- See "Windows Session Lock Issue" above
+- Restart Dedupper.exe if already hung
+- Avoid locking during future scans
 
 ## 📄 Licencia
 

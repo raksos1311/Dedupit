@@ -86,6 +86,27 @@ Incluye:
 ❗ Los checkboxes marcan archivos A CONSERVAR (no a eliminar)
 ❗ "Dedup all!" está bloqueado durante el escaneo (protección)
 
+⚠️ LIMITACIÓN CONOCIDA: BLOQUEO DE SESIÓN DE WINDOWS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔒 NO BLOQUEES tu sesión de Windows mientras el escaneo está en progreso.
+
+El proceso puede colgarse porque Windows suspende operaciones de lectura
+de archivos al bloquear la sesión, especialmente con:
+  • Archivos en unidades de red (\\servidor\...)
+  • Archivos en dispositivos USB externos
+  • Archivos en tu perfil de usuario (C:\Users\...)
+
+RECOMENDACIONES:
+✅ Mantén la sesión activa durante scans largos
+✅ Si necesitas alejarte, usa "Detener" primero
+✅ Usa screensaver sin bloqueo (solo apaga pantalla)
+✅ Para scans muy largos, evita carpetas de red/USB
+
+ALTERNATIVA: Si necesitas bloquear, ejecuta el scan sobre:
+  • Discos locales secundarios (D:\, E:\, etc.)
+  • Carpetas que no estén en tu perfil de usuario
+
 
 🔧 SOLUCIÓN DE PROBLEMAS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

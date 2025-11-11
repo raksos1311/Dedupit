@@ -102,6 +102,28 @@ Dedupper-v1.0.0-Windows-x64/
 
 ## 🐛 Problemas Conocidos
 
+### Crítico: Cuelgue al Bloquear Sesión de Windows 🔒
+
+**Síntoma:** El proceso se cuelga si bloqueas tu sesión de Windows durante un scan.
+
+**Causa:** `ThreadPoolExecutor` con I/O bloqueante se queda esperando cuando Windows suspende operaciones de lectura de archivos al bloquear la sesión.
+
+**Impacto:**
+- 🔴 **CRÍTICO** con archivos en red (`\\servidor\...`)
+- 🔴 **CRÍTICO** con dispositivos USB externos
+- 🟠 **ALTO** con archivos en perfil usuario (`C:\Users\...`)
+- 🟢 **BAJO** con discos locales secundarios (`D:\`, `E:\`, etc.)
+
+**Workaround:**
+- ✅ NO bloquees la sesión durante scans largos
+- ✅ Usa botón "Detener" antes de bloquear
+- ✅ Usa screensaver sin bloqueo (solo apaga pantalla)
+- ✅ Escanea solo discos locales secundarios si necesitas bloquear
+
+**Estado:** Documentado, no corregido en v1.0.0  
+**Roadmap:** Fix programado para v1.1.0 (multiprocessing con timeout)  
+**Análisis Técnico:** Ver `ANALISIS_BLOQUEO_SESION.md`
+
 ### No Críticos
 - El navegador puede no abrirse automáticamente en algunos sistemas
   - **Solución:** Abrir manualmente `http://localhost:5000`
@@ -200,15 +222,26 @@ Para reportar bugs o sugerir mejoras:
 
 ## 🎯 Roadmap Futuro (Posibles Mejoras)
 
-- [ ] Soporte para Linux y macOS
+### v1.1.0 (Próxima versión - Prioridad Alta)
+- [ ] **FIX: Cuelgue al bloquear sesión** 🔒
+  - Implementar multiprocessing con timeout para I/O
+  - Detectar archivos colgados y skipearlos
+  - Tiempo estimado: 4-6 horas
+  - Issue: Ver `ANALISIS_BLOQUEO_SESION.md`
+
+### v1.2.0 (Mejoras de UX)
 - [ ] Modo de análisis sin eliminación (solo reporte)
 - [ ] Exportar lista de duplicados a CSV/JSON
 - [ ] Filtros por tipo de archivo
 - [ ] Búsqueda por nombre de archivo
 - [ ] Ordenamiento de resultados
-- [ ] Comparación de contenido por similitud (no solo hash exacto)
+
+### v2.0.0 (Arquitectura)
+- [ ] **Modo servicio de Windows** (solución permanente para session lock)
+- [ ] Soporte para Linux y macOS
 - [ ] Interfaz de línea de comandos (CLI)
 - [ ] API REST para integración
+- [ ] Comparación de contenido por similitud (no solo hash exacto)
 - [ ] Configuración de puerto personalizado
 
 ---
