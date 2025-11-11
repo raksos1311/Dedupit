@@ -493,40 +493,58 @@ def procesar_miniaturas(carpeta_base, eliminar_originales):
 
 
 # --- Funciones Nuevas ---
-def generar_preview_html(carpeta_base):
+def generar_preview_html(carpeta_base, recursivo=False):
     """
     Genera un HTML con vista previa de 1 de cada 5 imágenes en la carpeta.
-    NO es recursivo, solo trabaja en la carpeta indicada.
-    Genera el HTML en la misma carpeta con el nombre 'preview.html'.
+    Puede ser recursivo o no según el parámetro.
+    Genera el HTML en la carpeta base con el nombre 'preview.html'.
     """
     global procesando, detener_flag
     procesando = True
     detener_flag = False
     
-    log_status("🖼️ Iniciando generación de preview HTML...")
+    modo = "recursivo" if recursivo else "no recursivo"
+    log_status(f"🖼️ Iniciando generación de preview HTML (modo {modo})...")
     log_status(f"📂 Carpeta objetivo: {carpeta_base}")
     
     try:
-        # Obtener solo archivos de imagen en la carpeta (no recursivo)
-        archivos = [f for f in os.listdir(carpeta_base) 
-                   if os.path.isfile(os.path.join(carpeta_base, f)) and 
-                   f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff'))]
+        # Recolectar todas las imágenes (recursivo o no)
+        imagenes_por_carpeta = {}  # {carpeta: [archivos]}
+        total_archivos = 0
         
-        if not archivos:
-            log_status("⚠️ No se encontraron imágenes en la carpeta.")
+        if recursivo:
+            log_status("🔄 Modo recursivo: escaneando subcarpetas...")
+            for root, dirs, files in os.walk(carpeta_base):
+                if detener_flag:
+                    break
+                
+                imagenes = [f for f in files if f.lower().endswith(
+                    ('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff'))]
+                
+                if imagenes:
+                    imagenes.sort()
+                    imagenes_por_carpeta[root] = imagenes
+                    total_archivos += len(imagenes)
+                    log_status(f"📁 {root}: {len(imagenes)} imágenes")
+        else:
+            log_status("📂 Modo no recursivo: solo carpeta raíz...")
+            archivos = [f for f in os.listdir(carpeta_base) 
+                       if os.path.isfile(os.path.join(carpeta_base, f)) and 
+                       f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff'))]
+            
+            if archivos:
+                archivos.sort()
+                imagenes_por_carpeta[carpeta_base] = archivos
+                total_archivos = len(archivos)
+        
+        if not imagenes_por_carpeta:
+            log_status("⚠️ No se encontraron imágenes.")
             procesando = False
             return
         
-        # Ordenar archivos alfabéticamente
-        archivos.sort()
+        log_status(f"� Total de imágenes encontradas: {total_archivos}")
         
-        # Seleccionar 1 de cada 5 imágenes
-        imagenes_seleccionadas = [archivos[i] for i in range(0, len(archivos), 5)]
-        
-        log_status(f"📊 Total de imágenes: {len(archivos)}")
-        log_status(f"📋 Imágenes seleccionadas para preview: {len(imagenes_seleccionadas)}")
-        
-        # Generar HTML
+        # Generar HTML con secciones por carpeta
         html_content = """<!DOCTYPE html>
 <html>
 <head>
@@ -544,6 +562,13 @@ def generar_preview_html(carpeta_base):
             border-bottom: 2px solid #17a2b8; 
             padding-bottom: 0.5em; 
         }
+        h2 {
+            color: #6f42c1;
+            margin-top: 2em;
+            padding: 0.5em;
+            background: #2a2a2a;
+            border-left: 4px solid #6f42c1;
+        }
         .stats { 
             background: #2a2a2a; 
             padding: 1em; 
@@ -554,7 +579,8 @@ def generar_preview_html(carpeta_base):
             display: grid; 
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
             gap: 1.5em; 
-            margin-top: 2em; 
+            margin-top: 1em;
+            margin-bottom: 2em;
         }
         .item { 
             background: #2a2a2a; 
@@ -579,56 +605,101 @@ def generar_preview_html(carpeta_base):
             font-size: 0.75em; 
             color: #888; 
         }
+        .item .path {
+            margin-top: 0.2em;
+            font-size: 0.7em;
+            color: #666;
+        }
     </style>
 </head>
 <body>
     <h1>🖼️ Preview: """ + os.path.basename(carpeta_base) + """</h1>
     <div class="stats">
-        <strong>📂 Carpeta:</strong> """ + carpeta_base + """<br>
-        <strong>📊 Total de imágenes:</strong> """ + str(len(archivos)) + """<br>
-        <strong>🔍 Muestreadas (1 de cada 5):</strong> """ + str(len(imagenes_seleccionadas)) + """
+        <strong>📂 Carpeta base:</strong> """ + carpeta_base + """<br>
+        <strong>🔄 Modo:</strong> """ + modo + """<br>
+        <strong>📊 Total de imágenes:</strong> """ + str(total_archivos) + """<br>
+        <strong>� Carpetas procesadas:</strong> """ + str(len(imagenes_por_carpeta)) + """
     </div>
-    <div class="gallery">
 """
         
-        # Agregar cada imagen seleccionada
-        for idx, nombre in enumerate(imagenes_seleccionadas):
+        # Procesar cada carpeta
+        total_muestreadas = 0
+        for carpeta, archivos in sorted(imagenes_por_carpeta.items()):
             if detener_flag:
                 log_status("🟥 Proceso detenido por el usuario.")
                 procesando = False
                 return
             
-            ruta_completa = os.path.join(carpeta_base, nombre)
-            try:
-                # Obtener dimensiones de la imagen
-                with Image.open(ruta_completa) as img:
-                    w, h = img.size
-                    tamaño_kb = os.path.getsize(ruta_completa) / 1024
-                    
-                    html_content += f"""
+            # Seleccionar 1 de cada 5 imágenes
+            imagenes_seleccionadas = [archivos[i] for i in range(0, len(archivos), 5)]
+            total_muestreadas += len(imagenes_seleccionadas)
+            
+            # Título de la sección (solo si es recursivo)
+            if recursivo:
+                carpeta_relativa = os.path.relpath(carpeta, carpeta_base)
+                if carpeta_relativa == ".":
+                    carpeta_relativa = "(raíz)"
+                html_content += f"""
+    <h2>📁 {carpeta_relativa}</h2>
+    <div style="color: #888; font-size: 0.9em; margin-bottom: 0.5em;">
+        {len(archivos)} imágenes | Muestreadas: {len(imagenes_seleccionadas)} (1 de cada 5)
+    </div>
+    <div class="gallery">
+"""
+            else:
+                html_content += f"""
+    <div style="color: #888; font-size: 0.9em; margin-bottom: 0.5em;">
+        🔍 Muestreadas: {len(imagenes_seleccionadas)} de {len(archivos)} (1 de cada 5)
+    </div>
+    <div class="gallery">
+"""
+            
+            # Agregar imágenes de esta carpeta
+            for nombre in imagenes_seleccionadas:
+                ruta_completa = os.path.join(carpeta, nombre)
+                try:
+                    # Obtener dimensiones de la imagen
+                    with Image.open(ruta_completa) as img:
+                        w, h = img.size
+                        tamaño_kb = os.path.getsize(ruta_completa) / 1024
+                        
+                        # Calcular ruta relativa para la imagen
+                        if recursivo:
+                            ruta_relativa = os.path.relpath(ruta_completa, carpeta_base)
+                        else:
+                            ruta_relativa = nombre
+                        
+                        html_content += f"""
         <div class="item">
-            <img src="{nombre}" alt="{nombre}">
+            <img src="{ruta_relativa}" alt="{nombre}">
             <div class="filename">📄 {nombre}</div>
             <div class="info">{w} x {h} px | {tamaño_kb:.1f} KB</div>
         </div>
 """
-                    log_status(f"✅ Procesada: {nombre} ({w}x{h})")
-            except Exception as e:
-                log_status(f"⚠️ Error al procesar {nombre}: {e}")
+                        log_status(f"✅ Procesada: {nombre} ({w}x{h})")
+                except Exception as e:
+                    log_status(f"⚠️ Error al procesar {nombre}: {e}")
+            
+            html_content += """
+    </div>
+"""
         
-        html_content += """
+        html_content += f"""
+    <div style="margin-top: 2em; padding-top: 1em; border-top: 1px solid #444; text-align: center; color: #888; font-size: 0.9em;">
+        📸 Preview generado por Dedupper | Total muestreadas: {total_muestreadas} de {total_archivos}
     </div>
 </body>
 </html>
 """
         
-        # Guardar HTML en la carpeta
+        # Guardar HTML en la carpeta base
         ruta_html = os.path.join(carpeta_base, "preview.html")
         with open(ruta_html, 'w', encoding='utf-8') as f:
             f.write(html_content)
         
         log_status(f"✅ Preview HTML generado exitosamente: {ruta_html}")
-        log_status(f"📋 Puedes abrirlo en tu navegador para ver las miniaturas.")
+        log_status(f"📋 Total muestreadas: {total_muestreadas} de {total_archivos} imágenes")
+        log_status(f"💡 Abre el archivo en tu navegador para ver las miniaturas.")
         
     except Exception as e:
         log_status(f"❌ Error al generar preview: {e}")
@@ -800,6 +871,266 @@ def analizar_imagenes(carpeta_base):
             "carpetas_afectadas": len(set([img["carpeta"] for img in imagenes_pequenas]))
         }
         
+        # ============ GENERAR HTML CON EL REPORTE ============
+        log_status("📄 Generando reporte HTML...")
+        try:
+            # Calcular estadísticas por carpeta para el HTML
+            carpetas_con_datos = []
+            for carpeta in sorted(stats_por_carpeta.keys()):
+                stats = stats_por_carpeta[carpeta]
+                if stats["total"] > 0:
+                    # Calcular estadísticas de tamaño y resolución
+                    imgs_carpeta = [img for img in imagenes_pequenas if img["carpeta"] == carpeta]
+                    
+                    # Stats de tamaño (en KB)
+                    tamanos_kb = [img["tamaño_kb"] for img in imgs_carpeta] if imgs_carpeta else []
+                    if tamanos_kb:
+                        max_tamaño = max(tamanos_kb)
+                        min_tamaño = min(tamanos_kb)
+                        # Moda de tamaño (categoría más común)
+                        moda_tamaño = max(stats["tamanos"].items(), key=lambda x: x[1])[0] if stats["tamanos"] else "N/A"
+                    else:
+                        max_tamaño = min_tamaño = moda_tamaño = "N/A"
+                    
+                    # Stats de resolución
+                    if stats["resoluciones"]:
+                        # Resolución más común (moda)
+                        moda_resolucion = max(stats["resoluciones"].items(), key=lambda x: x[1])[0]
+                        # Min y max resolución (por área de píxeles)
+                        resoluciones_list = [(res, cnt) for res, cnt in stats["resoluciones"].items()]
+                        resoluciones_con_area = []
+                        for res, cnt in resoluciones_list:
+                            try:
+                                w, h = map(int, res.split('x'))
+                                area = w * h
+                                resoluciones_con_area.append((res, area, cnt))
+                            except:
+                                pass
+                        
+                        if resoluciones_con_area:
+                            resoluciones_con_area.sort(key=lambda x: x[1])
+                            min_resolucion = resoluciones_con_area[0][0]
+                            max_resolucion = resoluciones_con_area[-1][0]
+                        else:
+                            min_resolucion = max_resolucion = "N/A"
+                    else:
+                        moda_resolucion = min_resolucion = max_resolucion = "N/A"
+                    
+                    carpetas_con_datos.append({
+                        "nombre": carpeta,
+                        "total": stats["total"],
+                        "afectadas": stats["pequenas"],
+                        "porcentaje_afectadas": (stats["pequenas"] / stats["total"] * 100) if stats["total"] > 0 else 0,
+                        "max_tamaño": f"{max_tamaño:.1f} KB" if isinstance(max_tamaño, (int, float)) else max_tamaño,
+                        "min_tamaño": f"{min_tamaño:.1f} KB" if isinstance(min_tamaño, (int, float)) else min_tamaño,
+                        "moda_tamaño": moda_tamaño,
+                        "max_resolucion": max_resolucion,
+                        "min_resolucion": min_resolucion,
+                        "moda_resolucion": moda_resolucion
+                    })
+            
+            # Generar HTML
+            html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Análisis de Imágenes - {os.path.basename(carpeta_base)}</title>
+    <style>
+        body {{ 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: #1a1a1a; 
+            color: #eee; 
+            margin: 2em; 
+            line-height: 1.6;
+        }}
+        h1 {{ 
+            color: #fd7e14; 
+            border-bottom: 3px solid #fd7e14; 
+            padding-bottom: 0.5em; 
+        }}
+        h2 {{
+            color: #17a2b8;
+            margin-top: 2em;
+            border-left: 4px solid #17a2b8;
+            padding-left: 0.5em;
+        }}
+        .summary {{ 
+            background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%); 
+            padding: 1.5em; 
+            border-radius: 0.5em; 
+            margin-bottom: 2em;
+            border: 1px solid #444;
+        }}
+        .summary-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1em;
+            margin-top: 1em;
+        }}
+        .summary-item {{
+            background: #333;
+            padding: 1em;
+            border-radius: 0.3em;
+            text-align: center;
+        }}
+        .summary-item .value {{
+            font-size: 2em;
+            font-weight: bold;
+            color: #fd7e14;
+        }}
+        .summary-item .label {{
+            font-size: 0.9em;
+            color: #aaa;
+            margin-top: 0.3em;
+        }}
+        table {{ 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 1em;
+            background: #2a2a2a;
+        }}
+        th {{ 
+            background: #fd7e14; 
+            color: #000; 
+            padding: 0.8em; 
+            text-align: left; 
+            font-weight: bold;
+        }}
+        td {{ 
+            padding: 0.8em; 
+            border-bottom: 1px solid #444; 
+        }}
+        tr:hover {{ 
+            background: #333; 
+        }}
+        .afectada {{
+            background: #dc3545;
+            color: #fff;
+            padding: 0.2em 0.5em;
+            border-radius: 0.3em;
+            font-weight: bold;
+            display: inline-block;
+        }}
+        .ok {{
+            background: #28a745;
+            color: #fff;
+            padding: 0.2em 0.5em;
+            border-radius: 0.3em;
+            font-weight: bold;
+            display: inline-block;
+        }}
+        .warning {{
+            background: #ffc107;
+            color: #000;
+            padding: 0.2em 0.5em;
+            border-radius: 0.3em;
+            font-weight: bold;
+            display: inline-block;
+        }}
+        .stats-mini {{
+            font-size: 0.85em;
+            color: #17a2b8;
+        }}
+        .footer {{
+            margin-top: 3em;
+            padding-top: 1em;
+            border-top: 1px solid #444;
+            text-align: center;
+            color: #888;
+            font-size: 0.9em;
+        }}
+    </style>
+</head>
+<body>
+    <h1>📊 Análisis de Imágenes</h1>
+    
+    <div class="summary">
+        <h2 style="margin-top: 0; border: none;">📈 Resumen General</h2>
+        <strong>📂 Carpeta Base:</strong> {carpeta_base}<br>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="value">{total_imagenes}</div>
+                <div class="label">Total Imágenes</div>
+            </div>
+            <div class="summary-item">
+                <div class="value">{len(imagenes_pequenas)}</div>
+                <div class="label">Imágenes Afectadas</div>
+            </div>
+            <div class="summary-item">
+                <div class="value">{porcentaje_pequenas:.1f}%</div>
+                <div class="label">% Afectadas</div>
+            </div>
+            <div class="summary-item">
+                <div class="value">{len(stats_por_carpeta)}</div>
+                <div class="label">Carpetas Analizadas</div>
+            </div>
+        </div>
+    </div>
+    
+    <h2>📁 Análisis por Carpeta</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Carpeta</th>
+                <th>Total</th>
+                <th>Afectadas</th>
+                <th>Tamaño (KB)</th>
+                <th>Resolución</th>
+            </tr>
+        </thead>
+        <tbody>
+"""
+            
+            # Agregar filas de carpetas
+            for carpeta_data in carpetas_con_datos:
+                # Badge de estado
+                if carpeta_data["afectadas"] == 0:
+                    badge = '<span class="ok">✓ OK</span>'
+                elif carpeta_data["porcentaje_afectadas"] > 50:
+                    badge = f'<span class="afectada">⚠ {carpeta_data["afectadas"]} ({carpeta_data["porcentaje_afectadas"]:.1f}%)</span>'
+                else:
+                    badge = f'<span class="warning">⚠ {carpeta_data["afectadas"]} ({carpeta_data["porcentaje_afectadas"]:.1f}%)</span>'
+                
+                html_content += f"""
+            <tr>
+                <td><strong>{carpeta_data["nombre"]}</strong></td>
+                <td>{carpeta_data["total"]}</td>
+                <td>{badge}</td>
+                <td>
+                    <span class="stats-mini">Max:</span> {carpeta_data["max_tamaño"]}<br>
+                    <span class="stats-mini">Min:</span> {carpeta_data["min_tamaño"]}<br>
+                    <span class="stats-mini">Moda:</span> {carpeta_data["moda_tamaño"]}
+                </td>
+                <td>
+                    <span class="stats-mini">Max:</span> {carpeta_data["max_resolucion"]}<br>
+                    <span class="stats-mini">Min:</span> {carpeta_data["min_resolucion"]}<br>
+                    <span class="stats-mini">Moda:</span> {carpeta_data["moda_resolucion"]}
+                </td>
+            </tr>
+"""
+            
+            html_content += """
+        </tbody>
+    </table>
+    
+    <div class="footer">
+        📊 Reporte generado por Dedupper - Analizador de Imágenes<br>
+        Imágenes afectadas: Dimensión mayor < 1280px
+    </div>
+</body>
+</html>
+"""
+            
+            # Guardar HTML
+            ruta_html = os.path.join(carpeta_base, "analisis_imagenes.html")
+            with open(ruta_html, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            log_status(f"✅ Reporte HTML generado: {ruta_html}")
+            
+        except Exception as e:
+            log_status(f"❌ Error al generar HTML: {e}")
+        
     except Exception as e:
         log_status(f"❌ Error durante el análisis: {e}")
     
@@ -874,9 +1205,10 @@ async function generarMiniaturas(){
 
 async function generarPreview(){
   const carpeta = document.getElementById('carpeta').value;
+  const recursivo = document.getElementById('recursivo').checked;
   document.getElementById('log').textContent = 'Generando preview HTML...';
   await fetch('/generar_preview?v=""" + VERSION + """', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({carpeta: carpeta})
+    body: JSON.stringify({carpeta: carpeta, recursivo: recursivo})
   });
   actualizar();
 }
@@ -1369,6 +1701,7 @@ def ejecutar_generar_preview():
     
     data = request.get_json()
     carpeta = data.get("carpeta")
+    recursivo = data.get("recursivo", False)
     
     if not carpeta or not os.path.exists(carpeta):
         return jsonify({"ok": False, "error": "Carpeta no válida"})
@@ -1376,8 +1709,8 @@ def ejecutar_generar_preview():
     estado_actual["mensaje"] = "Generando preview HTML..."
     estado_actual["detalles"].clear()
     
-    # Ejecutar en un hilo separado
-    threading.Thread(target=generar_preview_html, args=(carpeta,), daemon=True).start()
+    # Ejecutar en un hilo separado con parámetro recursivo
+    threading.Thread(target=generar_preview_html, args=(carpeta, recursivo), daemon=True).start()
     
     return jsonify({"ok": True})
 
