@@ -1,0 +1,169 @@
+╔════════════════════════════════════════════════════════════════════╗
+║                         DEDUPPER v1.0.0                            ║
+║          Sistema de Detección y Eliminación de Duplicados         ║
+╚════════════════════════════════════════════════════════════════════╝
+
+📋 DESCRIPCIÓN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Dedupper es una aplicación web que detecta y elimina archivos duplicados
+en tu sistema basándose en contenido real (hash MD5), no solo en nombres.
+
+Incluye:
+✅ Detección inteligente por tamaño + hash MD5
+✅ Procesamiento paralelo ultrarrápido
+✅ Actualización progresiva en tiempo real
+✅ Eliminación selectiva archivo por archivo
+✅ Botones de eliminación masiva inteligente
+✅ Limpieza de grupos ya procesados
+✅ Generación de miniaturas para imágenes
+✅ Logs detallados en tiempo real
+
+
+🚀 INSTALACIÓN Y USO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Ejecutar Dedupper.exe (doble clic)
+   
+2. El navegador se abrirá automáticamente en http://localhost:5000
+   Si no se abre, copia esta URL en tu navegador
+   
+3. En la interfaz web:
+   - Pega la ruta de la carpeta a analizar
+   - Marca "Incluir subcarpetas" si lo deseas
+   - Presiona "Buscar Duplicados"
+   
+4. Mientras procesa, verás actualizaciones cada 30 segundos
+   
+5. Usa los botones para eliminar:
+   📌 Marcar archivos específicos con checkboxes
+   🗑️ "Dedup it!" elimina los marcados en ese grupo
+   💥 "Dedup all!" elimina duplicados (respeta marcados)
+   🧹 "Clean dedupped" limpia grupos ya procesados de la vista
+
+
+⚙️ CARACTERÍSTICAS TÉCNICAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Procesamiento paralelo con ThreadPoolExecutor
+• Workers: 2× número de núcleos CPU
+• Hash MD5 en bloques de 8KB (archivos grandes sin problemas)
+• Actualización progresiva cada 30 segundos
+• Interfaz web responsive con polling de 500ms
+• Sistema anti-cache automático
+• Archivos clickeables (se abren con programa predeterminado)
+
+
+📊 EJEMPLO DE USO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Escaneo inicial:
+   Carpeta: C:\Users\Oscar\Fotos
+   ✓ Incluir subcarpetas
+   [Buscar Duplicados]
+   
+2. Verás progreso en tiempo real:
+   "🔎 Verificando grupo 1500/38269 (3.9%)"
+   "⚠️ Duplicados encontrados: 42 grupos"
+   
+3. Eliminación selectiva:
+   - Marca los archivos que deseas CONSERVAR
+   - Click en "Dedup it!" para eliminar los NO marcados
+   
+4. Eliminación masiva:
+   - Si no marcaste nada, "Dedup all!" mantiene el primero de cada grupo
+   - Si marcaste algunos, respeta tus selecciones
+   
+5. Limpieza visual:
+   - Click en "Clean dedupped" para ocultar grupos ya procesados
+
+
+⚠️ ADVERTENCIAS IMPORTANTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❗ Los archivos eliminados NO van a la papelera de reciclaje
+❗ La eliminación es PERMANENTE
+❗ Revisa cuidadosamente antes de eliminar
+❗ Los checkboxes marcan archivos A CONSERVAR (no a eliminar)
+❗ "Dedup all!" está bloqueado durante el escaneo (protección)
+
+
+🔧 SOLUCIÓN DE PROBLEMAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+▸ El navegador no abre automáticamente
+  → Abre manualmente: http://localhost:5000
+
+▸ "Puerto 5000 en uso"
+  → Cierra otras instancias de Dedupper
+  → Mata proceso: taskkill /F /IM Dedupper.exe
+
+▸ La interfaz no se actualiza
+  → Presiona Ctrl+F5 para recargar sin caché
+  → O Ctrl+Shift+R en algunos navegadores
+
+▸ El escaneo es muy lento
+  → Normal con muchos archivos grandes
+  → El progreso se actualiza cada 30 segundos
+  → Puedes empezar a eliminar mientras escanea
+
+▸ Error al eliminar archivos
+  → Verifica permisos en la carpeta
+  → Cierra programas que usen los archivos
+  → Ejecuta Dedupper como administrador si es necesario
+
+
+📁 ESTRUCTURA DEL PAQUETE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dedupper-v1.0.0/
+├── Dedupper.exe      ← Ejecutable principal (iniciar aquí)
+├── README.md         ← Documentación en inglés
+├── LEEME.txt         ← Este archivo (documentación en español)
+└── LICENCIA.txt      ← Términos de uso
+
+
+💻 REQUISITOS DEL SISTEMA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Windows 10/11 (64-bit)
+• 4 GB RAM mínimo (8 GB recomendado para datasets grandes)
+• Espacio en disco según tamaño del análisis
+• Permisos de lectura/escritura en carpetas a analizar
+
+
+📝 NOTAS DE VERSIÓN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+v1.0.0 (10/Nov/2025)
+--------------------
+✅ Primera versión estable
+✅ Procesamiento paralelo optimizado
+✅ Interfaz web completa
+✅ Sistema de eliminación selectiva y masiva
+✅ Actualización progresiva en tiempo real
+✅ Botón de limpieza de grupos procesados
+✅ Generación de miniaturas para imágenes
+✅ Logs detallados con timestamps
+✅ Sistema anti-cache robusto
+
+
+🆘 SOPORTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Para reportar problemas o sugerencias:
+📧 Email: [tu-email@ejemplo.com]
+🌐 GitHub: [tu-repo]
+
+
+⚖️ LICENCIA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Este software se proporciona "tal cual", sin garantías de ningún tipo.
+El autor no se responsabiliza por pérdida de datos.
+Usar bajo tu propio riesgo.
+Ver LICENCIA.txt para más detalles.
+
+
+═══════════════════════════════════════════════════════════════════════
+              ¡Gracias por usar Dedupper! 🎉
+═══════════════════════════════════════════════════════════════════════

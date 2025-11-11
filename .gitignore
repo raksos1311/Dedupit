@@ -82,3 +82,10 @@ ExecFiles/
 UNPACKED_DIR/
 media/
 uploads/
+
+# Build artifacts
+build/
+dist/
+*.spec
+*.zip
+Dedupper-v1.0.0-Windows-x64/

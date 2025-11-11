@@ -1,0 +1,54 @@
+MIT License
+
+Copyright (c) 2025 Dedupper Project
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+────────────────────────────────────────────────────────────────────────────
+
+DISCLAIMER / DESCARGO DE RESPONSABILIDAD:
+
+EN ESPAÑOL:
+Este software se proporciona "tal cual", sin garantía de ningún tipo, expresa
+o implícita. El autor no se hace responsable de ninguna pérdida de datos,
+daños o perjuicios que puedan resultar del uso de este software.
+
+La eliminación de archivos es PERMANENTE y no recuperable desde la papelera
+de reciclaje. El usuario es completamente responsable de verificar qué
+archivos se eliminan.
+
+IN ENGLISH:
+This software is provided "as is", without warranty of any kind, express or
+implied. The author is not responsible for any data loss, damage or harm that
+may result from the use of this software.
+
+File deletion is PERMANENT and not recoverable from the recycle bin. The user
+is fully responsible for verifying which files are deleted.
+
+────────────────────────────────────────────────────────────────────────────
+
+DEPENDENCIES / DEPENDENCIAS:
+
+This software uses the following open-source libraries:
+- Flask (BSD-3-Clause License)
+- Pillow (HPND License)
+- Python Standard Library (PSF License)
+- PyInstaller (GPL License with exception for distributed applications)
+
+All dependencies maintain their original licenses.
