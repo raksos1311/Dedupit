@@ -1714,6 +1714,6 @@ if __name__ == "__main__":
     estado_actual["resumen"].clear()
     estado_actual["duplicados"].clear()
     
-    print("🌐 Servidor Dedupper iniciado en http://localhost:5000")
+    print("🌐 Servidor Dedupper iniciado en http://localhost:5005")
     print("📌 Estado limpio - Sin resultados previos cargados")
     app.run(host="0.0.0.0", port=5005, debug=False)
