@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
 """
 Dedupit - Preview Generator
-Generates large preview images with a grid of thumbnails from a folder of photos.
+
+Generates large preview images (3000x2000px PNG) with a grid of thumbnails 
+from a folder of photos. The generator creates a 10x9 grid (90 slots) with 
+260x260 pixel thumbnails, leaving 40 pixels at the top for a header.
+
+The sampling strategy adapts to the number of photos:
+- 450+ photos: Samples 1 thumbnail per 5 photos
+- 90-449 photos: Distributes photos evenly across all 90 slots
+- < 90 photos: Shows all photos, leaving empty slots transparent
 """
 
 import os
