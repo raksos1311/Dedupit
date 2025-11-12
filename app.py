@@ -495,16 +495,17 @@ def procesar_miniaturas(carpeta_base, eliminar_originales):
 # --- Funciones Nuevas ---
 def generar_preview_html(carpeta_base, recursivo=False):
     """
-    Genera archivos HTML con vista previa de 1 de cada 5 imágenes.
-    Si recursivo=True: genera un preview.html en CADA subcarpeta con sus propias imágenes.
-    Si recursivo=False: genera un preview.html solo en la carpeta base.
+    Genera imágenes collage con vista previa de 1 de cada 5 imágenes.
+    Si recursivo=True: genera un preview.jpg en CADA subcarpeta con sus propias imágenes.
+    Si recursivo=False: genera un preview.jpg solo en la carpeta base.
+    Formato: Grid de miniaturas en una sola imagen PNG/JPG.
     """
     global procesando, detener_flag
     procesando = True
     detener_flag = False
     
     modo = "recursivo" if recursivo else "no recursivo"
-    log_status(f"🖼️ Iniciando generación de preview HTML (modo {modo})...")
+    log_status(f"🖼️ Iniciando generación de preview IMAGE (modo {modo})...")
     log_status(f"📂 Carpeta objetivo: {carpeta_base}")
     
     try:
@@ -539,7 +540,15 @@ def generar_preview_html(carpeta_base, recursivo=False):
         
         log_status(f"📊 Total de carpetas con imágenes: {len(carpetas_con_imagenes)}")
         
-        # Generar un preview.html en CADA carpeta
+        # Configuración del collage
+        THUMB_SIZE = 300  # Tamaño de cada miniatura
+        COLS = 4  # Columnas en el grid
+        PADDING = 10  # Espacio entre imágenes
+        HEADER_HEIGHT = 100  # Altura del encabezado con info
+        BG_COLOR = (26, 26, 26)  # Fondo oscuro
+        TEXT_COLOR = (238, 238, 238)  # Texto claro
+        
+        # Generar un preview.jpg en CADA carpeta
         total_archivos_generados = 0
         for carpeta_actual in carpetas_con_imagenes:
             if detener_flag:
@@ -547,7 +556,7 @@ def generar_preview_html(carpeta_base, recursivo=False):
                 procesando = False
                 return
             
-            # Listar solo las imágenes de esta carpeta específica (no recursivo)
+            # Listar solo las imágenes de esta carpeta específica
             archivos = [f for f in os.listdir(carpeta_actual) 
                        if os.path.isfile(os.path.join(carpeta_actual, f)) and 
                        f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff'))]
@@ -556,119 +565,94 @@ def generar_preview_html(carpeta_base, recursivo=False):
             # Seleccionar 1 de cada 5 imágenes
             imagenes_seleccionadas = [archivos[i] for i in range(0, len(archivos), 5)]
             
-            # Generar HTML para esta carpeta específica
-            carpeta_nombre = os.path.basename(carpeta_actual) if carpeta_actual != carpeta_base else "Raíz"
+            if not imagenes_seleccionadas:
+                continue
             
-            html_content = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Preview - {carpeta_nombre}</title>
-    <style>
-        body {{ 
-            font-family: Arial, sans-serif; 
-            background: #1a1a1a; 
-            color: #eee; 
-            margin: 2em; 
-        }}
-        h1 {{ 
-            color: #17a2b8; 
-            border-bottom: 2px solid #17a2b8; 
-            padding-bottom: 0.5em; 
-        }}
-        .stats {{ 
-            background: #2a2a2a; 
-            padding: 1em; 
-            border-radius: 0.5em; 
-            margin-bottom: 2em; 
-        }}
-        .gallery {{ 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
-            gap: 1.5em; 
-            margin-top: 1em;
-            margin-bottom: 2em;
-        }}
-        .item {{ 
-            background: #2a2a2a; 
-            padding: 1em; 
-            border-radius: 0.5em; 
-            text-align: center; 
-        }}
-        .item img {{ 
-            max-width: 100%; 
-            height: auto; 
-            border-radius: 0.3em; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
-        }}
-        .item .filename {{ 
-            margin-top: 0.5em; 
-            font-size: 0.85em; 
-            color: #17a2b8; 
-            word-break: break-all; 
-        }}
-        .item .info {{ 
-            margin-top: 0.3em; 
-            font-size: 0.75em; 
-            color: #888; 
-        }}
-    </style>
-</head>
-<body>
-    <h1>🖼️ Preview: {carpeta_nombre}</h1>
-    <div class="stats">
-        <strong>📂 Carpeta:</strong> {carpeta_actual}<br>
-        <strong>📊 Total de imágenes:</strong> {len(archivos)}<br>
-        <strong>🔍 Muestreadas:</strong> {len(imagenes_seleccionadas)} (1 de cada 5)
-    </div>
-    <div class="gallery">
-"""
+            # Calcular dimensiones del collage
+            num_imagenes = len(imagenes_seleccionadas)
+            rows = (num_imagenes + COLS - 1) // COLS  # Redondeo hacia arriba
             
-            # Agregar imágenes de esta carpeta
-            for nombre in imagenes_seleccionadas:
+            canvas_width = COLS * THUMB_SIZE + (COLS + 1) * PADDING
+            canvas_height = HEADER_HEIGHT + rows * THUMB_SIZE + (rows + 1) * PADDING
+            
+            # Crear canvas
+            from PIL import Image, ImageDraw, ImageFont
+            canvas = Image.new('RGB', (canvas_width, canvas_height), BG_COLOR)
+            draw = ImageDraw.Draw(canvas)
+            
+            # Dibujar encabezado con información
+            try:
+                # Intentar usar fuente system, si falla usar default
+                font_title = ImageFont.truetype("arial.ttf", 24)
+                font_info = ImageFont.truetype("arial.ttf", 16)
+            except:
+                font_title = ImageFont.load_default()
+                font_info = ImageFont.load_default()
+            
+            carpeta_nombre = os.path.basename(carpeta_actual)
+            titulo = f"Preview: {carpeta_nombre}"
+            info = f"{len(archivos)} imágenes | Muestreadas: {num_imagenes} (1/5)"
+            
+            # Centrar título
+            draw.text((PADDING, 20), titulo, fill=TEXT_COLOR, font=font_title)
+            draw.text((PADDING, 55), info, fill=(136, 136, 136), font=font_info)
+            
+            # Colocar miniaturas en el grid
+            y_offset = HEADER_HEIGHT + PADDING
+            for idx, nombre in enumerate(imagenes_seleccionadas):
+                if detener_flag:
+                    break
+                
+                row = idx // COLS
+                col = idx % COLS
+                
+                x = col * THUMB_SIZE + (col + 1) * PADDING
+                y = y_offset + row * THUMB_SIZE + row * PADDING
+                
                 ruta_completa = os.path.join(carpeta_actual, nombre)
+                
                 try:
-                    # Obtener dimensiones de la imagen
                     with Image.open(ruta_completa) as img:
-                        w, h = img.size
-                        tamaño_kb = os.path.getsize(ruta_completa) / 1024
+                        # Convertir a RGB si es necesario
+                        if img.mode != 'RGB':
+                            img = img.convert('RGB')
                         
-                        html_content += f"""
-        <div class="item">
-            <img src="{nombre}" alt="{nombre}">
-            <div class="filename">📄 {nombre}</div>
-            <div class="info">{w} x {h} px | {tamaño_kb:.1f} KB</div>
-        </div>
-"""
+                        # Redimensionar manteniendo aspect ratio
+                        img.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.Resampling.LANCZOS)
+                        
+                        # Centrar la imagen en el cuadro
+                        thumb_x = x + (THUMB_SIZE - img.width) // 2
+                        thumb_y = y + (THUMB_SIZE - img.height) // 2
+                        
+                        canvas.paste(img, (thumb_x, thumb_y))
+                        
                 except Exception as e:
                     log_status(f"⚠️ Error al procesar {nombre}: {e}")
+                    # Dibujar rectángulo gris si falla
+                    draw.rectangle([x, y, x + THUMB_SIZE, y + THUMB_SIZE], 
+                                 fill=(60, 60, 60), outline=(100, 100, 100))
             
-            html_content += f"""
-    </div>
-    <div style="margin-top: 2em; padding-top: 1em; border-top: 1px solid #444; text-align: center; color: #888; font-size: 0.9em;">
-        📸 Preview generado por Dedupper | {len(imagenes_seleccionadas)} de {len(archivos)} imágenes
-    </div>
-</body>
-</html>
-"""
-            
-            # Guardar HTML en esta carpeta específica
-            ruta_html = os.path.join(carpeta_actual, "preview.html")
-            with open(ruta_html, 'w', encoding='utf-8') as f:
-                f.write(html_content)
+            # Guardar imagen en esta carpeta específica
+            ruta_preview = os.path.join(carpeta_actual, "preview.jpg")
+            canvas.save(ruta_preview, 'JPEG', quality=90)
             
             total_archivos_generados += 1
             carpeta_rel = os.path.relpath(carpeta_actual, carpeta_base)
-            log_status(f"✅ Preview generado: {carpeta_rel}/preview.html ({len(imagenes_seleccionadas)} imágenes)")
+            tamaño_kb = os.path.getsize(ruta_preview) / 1024
+            log_status(f"✅ Preview generado: {carpeta_rel}/preview.jpg ({num_imagenes} imágenes, {tamaño_kb:.1f} KB)")
         
-        log_status(f"✅ Preview HTML generado en {total_archivos_generados} carpeta(s)")
-        log_status(f"💡 Abre los archivos preview.html en cada carpeta para ver las miniaturas.")
+        log_status(f"✅ Preview IMAGEN generado en {total_archivos_generados} carpeta(s)")
+        log_status(f"💡 Abre los archivos preview.jpg en cada carpeta (compatibles con móvil).")
         
     except Exception as e:
         log_status(f"❌ Error al generar preview: {e}")
+        import traceback
+        log_status(f"Traceback: {traceback.format_exc()}")
     
     procesando = False
     detener_flag = False
+
+
 
 
 def analizar_imagenes(carpeta_base):
