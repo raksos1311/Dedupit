@@ -652,12 +652,24 @@ def generar_preview_html(carpeta_base, recursivo=False):
             
             # Guardar imagen en esta carpeta específica
             ruta_preview = os.path.join(carpeta_actual, "preview.png")
+            
+            # Verificar si existe preview anterior
+            preview_existia = os.path.exists(ruta_preview)
+            if preview_existia:
+                try:
+                    os.remove(ruta_preview)
+                    log_status(f"🔄 Reemplazando preview existente en {os.path.basename(carpeta_actual)}")
+                except Exception as e:
+                    log_status(f"⚠️ No se pudo eliminar preview anterior: {e}")
+            
+            # Guardar nuevo preview
             canvas.save(ruta_preview, 'PNG')
             
             total_archivos_generados += 1
             carpeta_rel = os.path.relpath(carpeta_actual, carpeta_base)
             tamaño_kb = os.path.getsize(ruta_preview) / 1024
-            log_status(f"✅ Preview generado: {carpeta_rel}/preview.png ({len(imagenes_seleccionadas)} thumbnails, {tamaño_kb:.1f} KB)")
+            accion = "reemplazado" if preview_existia else "generado"
+            log_status(f"✅ Preview {accion}: {carpeta_rel}/preview.png ({len(imagenes_seleccionadas)} thumbnails, {tamaño_kb:.1f} KB)")
         
         log_status(f"✅ Preview LARGE generado en {total_archivos_generados} carpeta(s)")
         log_status(f"💡 Archivos preview.png de 3000x2000px con {TOTAL_SLOTS} slots (compatibles con móvil).")
