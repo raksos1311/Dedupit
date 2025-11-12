@@ -495,9 +495,9 @@ def procesar_miniaturas(carpeta_base, eliminar_originales):
 # --- Funciones Nuevas ---
 def generar_preview_html(carpeta_base, recursivo=False):
     """
-    Genera un HTML con vista previa de 1 de cada 5 imágenes en la carpeta.
-    Puede ser recursivo o no según el parámetro.
-    Genera el HTML en la carpeta base con el nombre 'preview.html'.
+    Genera archivos HTML con vista previa de 1 de cada 5 imágenes.
+    Si recursivo=True: genera un preview.html en CADA subcarpeta con sus propias imágenes.
+    Si recursivo=False: genera un preview.html solo en la carpeta base.
     """
     global procesando, detener_flag
     procesando = True
@@ -508,9 +508,8 @@ def generar_preview_html(carpeta_base, recursivo=False):
     log_status(f"📂 Carpeta objetivo: {carpeta_base}")
     
     try:
-        # Recolectar todas las imágenes (recursivo o no)
-        imagenes_por_carpeta = {}  # {carpeta: [archivos]}
-        total_archivos = 0
+        # Recolectar todas las carpetas con imágenes
+        carpetas_con_imagenes = []
         
         if recursivo:
             log_status("🔄 Modo recursivo: escaneando subcarpetas...")
@@ -522,9 +521,7 @@ def generar_preview_html(carpeta_base, recursivo=False):
                     ('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff'))]
                 
                 if imagenes:
-                    imagenes.sort()
-                    imagenes_por_carpeta[root] = imagenes
-                    total_archivos += len(imagenes)
+                    carpetas_con_imagenes.append(root)
                     log_status(f"📁 {root}: {len(imagenes)} imágenes")
         else:
             log_status("📂 Modo no recursivo: solo carpeta raíz...")
@@ -533,173 +530,139 @@ def generar_preview_html(carpeta_base, recursivo=False):
                        f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff'))]
             
             if archivos:
-                archivos.sort()
-                imagenes_por_carpeta[carpeta_base] = archivos
-                total_archivos = len(archivos)
+                carpetas_con_imagenes.append(carpeta_base)
         
-        if not imagenes_por_carpeta:
+        if not carpetas_con_imagenes:
             log_status("⚠️ No se encontraron imágenes.")
             procesando = False
             return
         
-        log_status(f"� Total de imágenes encontradas: {total_archivos}")
+        log_status(f"📊 Total de carpetas con imágenes: {len(carpetas_con_imagenes)}")
         
-        # Generar HTML con secciones por carpeta
-        html_content = """<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Preview - """ + os.path.basename(carpeta_base) + """</title>
-    <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            background: #1a1a1a; 
-            color: #eee; 
-            margin: 2em; 
-        }
-        h1 { 
-            color: #17a2b8; 
-            border-bottom: 2px solid #17a2b8; 
-            padding-bottom: 0.5em; 
-        }
-        h2 {
-            color: #6f42c1;
-            margin-top: 2em;
-            padding: 0.5em;
-            background: #2a2a2a;
-            border-left: 4px solid #6f42c1;
-        }
-        .stats { 
-            background: #2a2a2a; 
-            padding: 1em; 
-            border-radius: 0.5em; 
-            margin-bottom: 2em; 
-        }
-        .gallery { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
-            gap: 1.5em; 
-            margin-top: 1em;
-            margin-bottom: 2em;
-        }
-        .item { 
-            background: #2a2a2a; 
-            padding: 1em; 
-            border-radius: 0.5em; 
-            text-align: center; 
-        }
-        .item img { 
-            max-width: 100%; 
-            height: auto; 
-            border-radius: 0.3em; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
-        }
-        .item .filename { 
-            margin-top: 0.5em; 
-            font-size: 0.85em; 
-            color: #17a2b8; 
-            word-break: break-all; 
-        }
-        .item .info { 
-            margin-top: 0.3em; 
-            font-size: 0.75em; 
-            color: #888; 
-        }
-        .item .path {
-            margin-top: 0.2em;
-            font-size: 0.7em;
-            color: #666;
-        }
-    </style>
-</head>
-<body>
-    <h1>🖼️ Preview: """ + os.path.basename(carpeta_base) + """</h1>
-    <div class="stats">
-        <strong>📂 Carpeta base:</strong> """ + carpeta_base + """<br>
-        <strong>🔄 Modo:</strong> """ + modo + """<br>
-        <strong>📊 Total de imágenes:</strong> """ + str(total_archivos) + """<br>
-        <strong>� Carpetas procesadas:</strong> """ + str(len(imagenes_por_carpeta)) + """
-    </div>
-"""
-        
-        # Procesar cada carpeta
-        total_muestreadas = 0
-        for carpeta, archivos in sorted(imagenes_por_carpeta.items()):
+        # Generar un preview.html en CADA carpeta
+        total_archivos_generados = 0
+        for carpeta_actual in carpetas_con_imagenes:
             if detener_flag:
                 log_status("🟥 Proceso detenido por el usuario.")
                 procesando = False
                 return
             
+            # Listar solo las imágenes de esta carpeta específica (no recursivo)
+            archivos = [f for f in os.listdir(carpeta_actual) 
+                       if os.path.isfile(os.path.join(carpeta_actual, f)) and 
+                       f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff'))]
+            archivos.sort()
+            
             # Seleccionar 1 de cada 5 imágenes
             imagenes_seleccionadas = [archivos[i] for i in range(0, len(archivos), 5)]
-            total_muestreadas += len(imagenes_seleccionadas)
             
-            # Título de la sección (solo si es recursivo)
-            if recursivo:
-                carpeta_relativa = os.path.relpath(carpeta, carpeta_base)
-                if carpeta_relativa == ".":
-                    carpeta_relativa = "(raíz)"
-                html_content += f"""
-    <h2>📁 {carpeta_relativa}</h2>
-    <div style="color: #888; font-size: 0.9em; margin-bottom: 0.5em;">
-        {len(archivos)} imágenes | Muestreadas: {len(imagenes_seleccionadas)} (1 de cada 5)
-    </div>
-    <div class="gallery">
-"""
-            else:
-                html_content += f"""
-    <div style="color: #888; font-size: 0.9em; margin-bottom: 0.5em;">
-        🔍 Muestreadas: {len(imagenes_seleccionadas)} de {len(archivos)} (1 de cada 5)
+            # Generar HTML para esta carpeta específica
+            carpeta_nombre = os.path.basename(carpeta_actual) if carpeta_actual != carpeta_base else "Raíz"
+            
+            html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Preview - {carpeta_nombre}</title>
+    <style>
+        body {{ 
+            font-family: Arial, sans-serif; 
+            background: #1a1a1a; 
+            color: #eee; 
+            margin: 2em; 
+        }}
+        h1 {{ 
+            color: #17a2b8; 
+            border-bottom: 2px solid #17a2b8; 
+            padding-bottom: 0.5em; 
+        }}
+        .stats {{ 
+            background: #2a2a2a; 
+            padding: 1em; 
+            border-radius: 0.5em; 
+            margin-bottom: 2em; 
+        }}
+        .gallery {{ 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            gap: 1.5em; 
+            margin-top: 1em;
+            margin-bottom: 2em;
+        }}
+        .item {{ 
+            background: #2a2a2a; 
+            padding: 1em; 
+            border-radius: 0.5em; 
+            text-align: center; 
+        }}
+        .item img {{ 
+            max-width: 100%; 
+            height: auto; 
+            border-radius: 0.3em; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
+        }}
+        .item .filename {{ 
+            margin-top: 0.5em; 
+            font-size: 0.85em; 
+            color: #17a2b8; 
+            word-break: break-all; 
+        }}
+        .item .info {{ 
+            margin-top: 0.3em; 
+            font-size: 0.75em; 
+            color: #888; 
+        }}
+    </style>
+</head>
+<body>
+    <h1>🖼️ Preview: {carpeta_nombre}</h1>
+    <div class="stats">
+        <strong>📂 Carpeta:</strong> {carpeta_actual}<br>
+        <strong>📊 Total de imágenes:</strong> {len(archivos)}<br>
+        <strong>🔍 Muestreadas:</strong> {len(imagenes_seleccionadas)} (1 de cada 5)
     </div>
     <div class="gallery">
 """
             
             # Agregar imágenes de esta carpeta
             for nombre in imagenes_seleccionadas:
-                ruta_completa = os.path.join(carpeta, nombre)
+                ruta_completa = os.path.join(carpeta_actual, nombre)
                 try:
                     # Obtener dimensiones de la imagen
                     with Image.open(ruta_completa) as img:
                         w, h = img.size
                         tamaño_kb = os.path.getsize(ruta_completa) / 1024
                         
-                        # Calcular ruta relativa para la imagen
-                        if recursivo:
-                            ruta_relativa = os.path.relpath(ruta_completa, carpeta_base)
-                        else:
-                            ruta_relativa = nombre
-                        
                         html_content += f"""
         <div class="item">
-            <img src="{ruta_relativa}" alt="{nombre}">
+            <img src="{nombre}" alt="{nombre}">
             <div class="filename">📄 {nombre}</div>
             <div class="info">{w} x {h} px | {tamaño_kb:.1f} KB</div>
         </div>
 """
-                        log_status(f"✅ Procesada: {nombre} ({w}x{h})")
                 except Exception as e:
                     log_status(f"⚠️ Error al procesar {nombre}: {e}")
             
-            html_content += """
+            html_content += f"""
     </div>
-"""
-        
-        html_content += f"""
     <div style="margin-top: 2em; padding-top: 1em; border-top: 1px solid #444; text-align: center; color: #888; font-size: 0.9em;">
-        📸 Preview generado por Dedupper | Total muestreadas: {total_muestreadas} de {total_archivos}
+        📸 Preview generado por Dedupper | {len(imagenes_seleccionadas)} de {len(archivos)} imágenes
     </div>
 </body>
 </html>
 """
+            
+            # Guardar HTML en esta carpeta específica
+            ruta_html = os.path.join(carpeta_actual, "preview.html")
+            with open(ruta_html, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            total_archivos_generados += 1
+            carpeta_rel = os.path.relpath(carpeta_actual, carpeta_base)
+            log_status(f"✅ Preview generado: {carpeta_rel}/preview.html ({len(imagenes_seleccionadas)} imágenes)")
         
-        # Guardar HTML en la carpeta base
-        ruta_html = os.path.join(carpeta_base, "preview.html")
-        with open(ruta_html, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-        
-        log_status(f"✅ Preview HTML generado exitosamente: {ruta_html}")
-        log_status(f"📋 Total muestreadas: {total_muestreadas} de {total_archivos} imágenes")
-        log_status(f"💡 Abre el archivo en tu navegador para ver las miniaturas.")
+        log_status(f"✅ Preview HTML generado en {total_archivos_generados} carpeta(s)")
+        log_status(f"💡 Abre los archivos preview.html en cada carpeta para ver las miniaturas.")
         
     except Exception as e:
         log_status(f"❌ Error al generar preview: {e}")
@@ -1753,4 +1716,4 @@ if __name__ == "__main__":
     
     print("🌐 Servidor Dedupper iniciado en http://localhost:5000")
     print("📌 Estado limpio - Sin resultados previos cargados")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5005, debug=False)
