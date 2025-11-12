@@ -154,14 +154,21 @@ class PreviewGenerator:
         # Available space after header
         available_height = self.CANVAS_HEIGHT - self.HEADER_HEIGHT
         
-        # Calculate spacing between thumbnails
-        horizontal_spacing = (self.CANVAS_WIDTH - (self.GRID_COLS * self.THUMBNAIL_SIZE)) / (self.GRID_COLS + 1)
-        vertical_spacing = (available_height - (self.GRID_ROWS * self.THUMBNAIL_SIZE)) / (self.GRID_ROWS + 1)
+        # Calculate the total space needed and available space for margins
+        total_thumb_width = self.GRID_COLS * self.THUMBNAIL_SIZE
+        total_thumb_height = self.GRID_ROWS * self.THUMBNAIL_SIZE
+        
+        # Calculate spacing (can be negative if thumbnails don't fit - they'll overlap)
+        # We use GRID_COLS + 1 gaps horizontally and GRID_ROWS + 1 gaps vertically
+        horizontal_spacing = (self.CANVAS_WIDTH - total_thumb_width) / (self.GRID_COLS + 1)
+        vertical_spacing = (available_height - total_thumb_height) / (self.GRID_ROWS + 1)
         
         for row in range(self.GRID_ROWS):
             for col in range(self.GRID_COLS):
+                # Position starts with margin, then adds thumbnail size and spacing
                 x = int(horizontal_spacing * (col + 1) + self.THUMBNAIL_SIZE * col)
-                y = int(self.HEADER_HEIGHT + vertical_spacing * (row + 1) + self.THUMBNAIL_SIZE * row)
+                # Ensure y is at least HEADER_HEIGHT
+                y = int(max(self.HEADER_HEIGHT, self.HEADER_HEIGHT + vertical_spacing * (row + 1) + self.THUMBNAIL_SIZE * row))
                 positions.append((x, y))
         
         return positions
