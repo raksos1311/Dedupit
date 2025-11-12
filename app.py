@@ -495,17 +495,21 @@ def procesar_miniaturas(carpeta_base, eliminar_originales):
 # --- Funciones Nuevas ---
 def generar_preview_html(carpeta_base, recursivo=False):
     """
-    Genera imágenes collage con vista previa de 1 de cada 5 imágenes.
-    Si recursivo=True: genera un preview.jpg en CADA subcarpeta con sus propias imágenes.
-    Si recursivo=False: genera un preview.jpg solo en la carpeta base.
-    Formato: Grid de miniaturas en una sola imagen PNG/JPG.
+    Genera preview PNG de 3000x2000px con grid 10x9 (90 thumbnails de 260x260px).
+    Si recursivo=True: genera un preview.png en CADA subcarpeta con sus propias imágenes.
+    Si recursivo=False: genera un preview.png solo en la carpeta base.
+    
+    Estrategia de muestreo:
+    - ≥450 fotos: 1 thumbnail cada 5 fotos (90 thumbnails)
+    - 90-449 fotos: Distribuir uniformemente en los 90 slots
+    - <90 fotos: Mostrar todas, dejar slots vacíos transparentes
     """
     global procesando, detener_flag
     procesando = True
     detener_flag = False
     
     modo = "recursivo" if recursivo else "no recursivo"
-    log_status(f"🖼️ Iniciando generación de preview IMAGE (modo {modo})...")
+    log_status(f"🖼️ Iniciando generación de preview LARGE (3000x2000px, modo {modo})...")
     log_status(f"📂 Carpeta objetivo: {carpeta_base}")
     
     try:
@@ -519,7 +523,7 @@ def generar_preview_html(carpeta_base, recursivo=False):
                     break
                 
                 imagenes = [f for f in files if f.lower().endswith(
-                    ('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff'))]
+                    ('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff', '.webp'))]
                 
                 if imagenes:
                     carpetas_con_imagenes.append(root)
@@ -528,7 +532,7 @@ def generar_preview_html(carpeta_base, recursivo=False):
             log_status("📂 Modo no recursivo: solo carpeta raíz...")
             archivos = [f for f in os.listdir(carpeta_base) 
                        if os.path.isfile(os.path.join(carpeta_base, f)) and 
-                       f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff'))]
+                       f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff', '.webp'))]
             
             if archivos:
                 carpetas_con_imagenes.append(carpeta_base)
@@ -540,15 +544,17 @@ def generar_preview_html(carpeta_base, recursivo=False):
         
         log_status(f"📊 Total de carpetas con imágenes: {len(carpetas_con_imagenes)}")
         
-        # Configuración del collage
-        THUMB_SIZE = 300  # Tamaño de cada miniatura
-        COLS = 4  # Columnas en el grid
-        PADDING = 10  # Espacio entre imágenes
-        HEADER_HEIGHT = 100  # Altura del encabezado con info
-        BG_COLOR = (26, 26, 26)  # Fondo oscuro
-        TEXT_COLOR = (238, 238, 238)  # Texto claro
+        # Configuración del collage - ESPECIFICACIONES FIJAS
+        CANVAS_WIDTH = 3000
+        CANVAS_HEIGHT = 2000
+        GRID_COLS = 10
+        GRID_ROWS = 9
+        THUMBNAIL_SIZE = 260
+        HEADER_HEIGHT = 40
+        TOTAL_SLOTS = GRID_COLS * GRID_ROWS  # 90
+        MIN_PHOTOS_THRESHOLD = TOTAL_SLOTS * 5  # 450
         
-        # Generar un preview.jpg en CADA carpeta
+        # Generar un preview.png en CADA carpeta
         total_archivos_generados = 0
         for carpeta_actual in carpetas_con_imagenes:
             if detener_flag:
@@ -559,90 +565,102 @@ def generar_preview_html(carpeta_base, recursivo=False):
             # Listar solo las imágenes de esta carpeta específica
             archivos = [f for f in os.listdir(carpeta_actual) 
                        if os.path.isfile(os.path.join(carpeta_actual, f)) and 
-                       f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff'))]
+                       f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff', '.webp'))]
             archivos.sort()
             
-            # Seleccionar 1 de cada 5 imágenes
-            imagenes_seleccionadas = [archivos[i] for i in range(0, len(archivos), 5)]
-            
-            if not imagenes_seleccionadas:
+            total_fotos = len(archivos)
+            if total_fotos == 0:
                 continue
             
-            # Calcular dimensiones del collage
-            num_imagenes = len(imagenes_seleccionadas)
-            rows = (num_imagenes + COLS - 1) // COLS  # Redondeo hacia arriba
+            # Calcular muestreo según la cantidad de fotos
+            if total_fotos >= MIN_PHOTOS_THRESHOLD:
+                # ≥450 fotos: 1 thumbnail cada 5 fotos
+                num_thumbnails = TOTAL_SLOTS
+                sample_interval = 5
+                imagenes_seleccionadas = [archivos[i] for i in range(0, min(total_fotos, num_thumbnails * sample_interval), sample_interval)]
+            elif total_fotos > TOTAL_SLOTS:
+                # 90-449 fotos: Distribuir uniformemente en los 90 slots
+                num_thumbnails = TOTAL_SLOTS
+                sample_interval = total_fotos / TOTAL_SLOTS
+                imagenes_seleccionadas = []
+                for i in range(num_thumbnails):
+                    index = int(i * sample_interval)
+                    if index < total_fotos:
+                        imagenes_seleccionadas.append(archivos[index])
+            else:
+                # <90 fotos: Mostrar todas
+                num_thumbnails = total_fotos
+                imagenes_seleccionadas = archivos
             
-            canvas_width = COLS * THUMB_SIZE + (COLS + 1) * PADDING
-            canvas_height = HEADER_HEIGHT + rows * THUMB_SIZE + (rows + 1) * PADDING
+            log_status(f"📸 {total_fotos} imágenes → muestreando {len(imagenes_seleccionadas)} thumbnails")
             
-            # Crear canvas
+            # Crear canvas con transparencia
             from PIL import Image, ImageDraw, ImageFont
-            canvas = Image.new('RGB', (canvas_width, canvas_height), BG_COLOR)
-            draw = ImageDraw.Draw(canvas)
+            canvas = Image.new('RGBA', (CANVAS_WIDTH, CANVAS_HEIGHT), (255, 255, 255, 0))
             
-            # Dibujar encabezado con información
-            try:
-                # Intentar usar fuente system, si falla usar default
-                font_title = ImageFont.truetype("arial.ttf", 24)
-                font_info = ImageFont.truetype("arial.ttf", 16)
-            except:
-                font_title = ImageFont.load_default()
-                font_info = ImageFont.load_default()
+            # Calcular posiciones del grid
+            available_height = CANVAS_HEIGHT - HEADER_HEIGHT
+            total_thumb_width = GRID_COLS * THUMBNAIL_SIZE
+            total_thumb_height = GRID_ROWS * THUMBNAIL_SIZE
             
-            carpeta_nombre = os.path.basename(carpeta_actual)
-            titulo = f"Preview: {carpeta_nombre}"
-            info = f"{len(archivos)} imágenes | Muestreadas: {num_imagenes} (1/5)"
-            
-            # Centrar título
-            draw.text((PADDING, 20), titulo, fill=TEXT_COLOR, font=font_title)
-            draw.text((PADDING, 55), info, fill=(136, 136, 136), font=font_info)
+            horizontal_spacing = (CANVAS_WIDTH - total_thumb_width) / (GRID_COLS + 1)
+            vertical_spacing = (available_height - total_thumb_height) / (GRID_ROWS + 1)
             
             # Colocar miniaturas en el grid
-            y_offset = HEADER_HEIGHT + PADDING
             for idx, nombre in enumerate(imagenes_seleccionadas):
                 if detener_flag:
                     break
+                if idx >= TOTAL_SLOTS:
+                    break
                 
-                row = idx // COLS
-                col = idx % COLS
+                row = idx // GRID_COLS
+                col = idx % GRID_COLS
                 
-                x = col * THUMB_SIZE + (col + 1) * PADDING
-                y = y_offset + row * THUMB_SIZE + row * PADDING
+                x = int(horizontal_spacing * (col + 1) + THUMBNAIL_SIZE * col)
+                y = int(max(HEADER_HEIGHT, HEADER_HEIGHT + vertical_spacing * (row + 1) + THUMBNAIL_SIZE * row))
                 
                 ruta_completa = os.path.join(carpeta_actual, nombre)
                 
                 try:
                     with Image.open(ruta_completa) as img:
                         # Convertir a RGB si es necesario
-                        if img.mode != 'RGB':
+                        if img.mode not in ('RGB', 'RGBA'):
                             img = img.convert('RGB')
                         
                         # Redimensionar manteniendo aspect ratio
-                        img.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.Resampling.LANCZOS)
+                        img.thumbnail((THUMBNAIL_SIZE, THUMBNAIL_SIZE), Image.Resampling.LANCZOS)
+                        
+                        # Crear thumbnail cuadrado con padding negro
+                        thumb = Image.new('RGB', (THUMBNAIL_SIZE, THUMBNAIL_SIZE), (0, 0, 0))
                         
                         # Centrar la imagen en el cuadro
-                        thumb_x = x + (THUMB_SIZE - img.width) // 2
-                        thumb_y = y + (THUMB_SIZE - img.height) // 2
+                        thumb_x = (THUMBNAIL_SIZE - img.width) // 2
+                        thumb_y = (THUMBNAIL_SIZE - img.height) // 2
+                        thumb.paste(img, (thumb_x, thumb_y))
                         
-                        canvas.paste(img, (thumb_x, thumb_y))
+                        # Convertir a RGBA para pegar con transparencia
+                        if thumb.mode != 'RGBA':
+                            thumb = thumb.convert('RGBA')
+                        
+                        canvas.paste(thumb, (x, y), thumb)
                         
                 except Exception as e:
                     log_status(f"⚠️ Error al procesar {nombre}: {e}")
-                    # Dibujar rectángulo gris si falla
-                    draw.rectangle([x, y, x + THUMB_SIZE, y + THUMB_SIZE], 
-                                 fill=(60, 60, 60), outline=(100, 100, 100))
+                    # Crear thumbnail negro en caso de error
+                    thumb_error = Image.new('RGBA', (THUMBNAIL_SIZE, THUMBNAIL_SIZE), (0, 0, 0, 255))
+                    canvas.paste(thumb_error, (x, y), thumb_error)
             
             # Guardar imagen en esta carpeta específica
-            ruta_preview = os.path.join(carpeta_actual, "preview.jpg")
-            canvas.save(ruta_preview, 'JPEG', quality=90)
+            ruta_preview = os.path.join(carpeta_actual, "preview.png")
+            canvas.save(ruta_preview, 'PNG')
             
             total_archivos_generados += 1
             carpeta_rel = os.path.relpath(carpeta_actual, carpeta_base)
             tamaño_kb = os.path.getsize(ruta_preview) / 1024
-            log_status(f"✅ Preview generado: {carpeta_rel}/preview.jpg ({num_imagenes} imágenes, {tamaño_kb:.1f} KB)")
+            log_status(f"✅ Preview generado: {carpeta_rel}/preview.png ({len(imagenes_seleccionadas)} thumbnails, {tamaño_kb:.1f} KB)")
         
-        log_status(f"✅ Preview IMAGEN generado en {total_archivos_generados} carpeta(s)")
-        log_status(f"💡 Abre los archivos preview.jpg en cada carpeta (compatibles con móvil).")
+        log_status(f"✅ Preview LARGE generado en {total_archivos_generados} carpeta(s)")
+        log_status(f"💡 Archivos preview.png de 3000x2000px con {TOTAL_SLOTS} slots (compatibles con móvil).")
         
     except Exception as e:
         log_status(f"❌ Error al generar preview: {e}")
